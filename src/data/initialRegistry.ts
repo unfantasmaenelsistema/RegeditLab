@@ -1,4 +1,6 @@
-import { MissionScenario, RegistryKeyNode, RegistryValue } from '../types/registry';
+import { MissionScenario, RegistryKeyNode } from '../types/registry';
+
+export { formatRegistryDataForDisplay } from '../engine/registryEngine';
 
 export function findNodeByPath(root: RegistryKeyNode, targetPath: string): RegistryKeyNode | null {
   if (root.path.toLowerCase() === targetPath.toLowerCase()) {
@@ -18,17 +20,37 @@ export function getValueData(root: RegistryKeyNode, keyPath: string, valueName: 
   return val?.data;
 }
 
-export function formatRegistryDataForDisplay(val: RegistryValue): string {
-  if (val.type === 'REG_DWORD' || val.type === 'REG_QWORD') {
-    const num = parseInt(val.data, 10);
-    if (isNaN(num)) return `0x00000000 (0)`;
-    const hex = (num >>> 0).toString(16).padStart(8, '0');
-    return `0x${hex} (${num})`;
-  }
-  if (val.type === 'REG_MULTI_SZ') {
-    return val.data.replace(/\n/g, ' ');
-  }
-  return val.data === '' ? '(valor no establecido)' : val.data;
+const RUN_KEYS = [
+  'Equipo\\HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run',
+  'Equipo\\HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run',
+];
+
+/**
+ * El minero sigue activo mientras alguna entrada Run apunte a miner_svc.exe,
+ * se llame como se llame el valor: renombrarlo o moverlo a HKLM no lo neutraliza.
+ */
+export function isMinerActive(root: RegistryKeyNode): boolean {
+  return RUN_KEYS.some((path) =>
+    findNodeByPath(root, path)?.values.some((v) => v.data.toLowerCase().includes('miner_svc.exe'))
+  );
+}
+
+/**
+ * El Inicio Rápido es una hibernación parcial: si falta HiberbootEnabled se toma
+ * como 1 (valor por defecto) y también se apaga si se desactiva la hibernación entera.
+ */
+export function isFastStartupActive(root: RegistryKeyNode): boolean {
+  const hiberboot = getValueData(
+    root,
+    'Equipo\\HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Power',
+    'HiberbootEnabled'
+  );
+  const hibernate = getValueData(
+    root,
+    'Equipo\\HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Power',
+    'HibernateEnabled'
+  );
+  return hiberboot !== '0' && hibernate !== '0';
 }
 
 export const INITIAL_REGISTRY_TREE: RegistryKeyNode = {
@@ -286,7 +308,7 @@ export const INITIAL_REGISTRY_TREE: RegistryKeyNode = {
                             'Todos los programas listados aquí se ejecutan automáticamente DESPUÉS de que este usuario inicia sesión y con sus permisos estándar. Es el lugar favorito del malware sin privilegios de administrador para lograr persistencia.',
                           equivalentPath: 'Equipo\\HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run',
                           precedenceNote:
-                            'Windows ejecuta primero las entradas de HKLM\\...\\Run (para todos los usuarios) y acto seguido las de HKCU\\...\\Run (exclusivas de este usuario). Ambas listas se suman.',
+                            'Ambas listas se suman: al iniciar sesión Explorer lanza las entradas de HKLM\\...\\Run (para todos los usuarios) y las de HKCU\\...\\Run (solo este usuario), normalmente primero las de HKLM. No hay un orden garantizado entre programas, así que ninguno debe depender de otro para arrancar.',
                           values: [
                             { id: 'hkcu-run-def', name: '(Predeterminado)', type: 'REG_SZ', data: '', isDefault: true },
                             {
@@ -487,7 +509,7 @@ export const INITIAL_REGISTRY_TREE: RegistryKeyNode = {
                           description: 'Muestra el nombre comercial de la CPU y su frecuencia base en MHz.',
                           values: [
                             { id: 'hklm-cpu0-def', name: '(Predeterminado)', type: 'REG_SZ', data: '', isDefault: true },
-                            { id: 'hklm-cpu0-name', name: 'ProcessorNameString', type: 'REG_SZ', data: 'Intel(R) Core(TM) i7-13700K @ 3.40GHz', description: 'Nombre comercial del procesador.' },
+                            { id: 'hklm-cpu0-name', name: 'ProcessorNameString', type: 'REG_SZ', data: '13th Gen Intel(R) Core(TM) i7-13700K', description: 'Nombre comercial del procesador.' },
                             { id: 'hklm-cpu0-mhz', name: '~MHz', type: 'REG_DWORD', data: '3400', description: 'Frecuencia base del procesador en Megahercios.' }
                           ],
                           children: []
@@ -548,10 +570,10 @@ export const INITIAL_REGISTRY_TREE: RegistryKeyNode = {
                           type: 'REG_SZ',
                           data: 'C:\\Program Files',
                           description:
-                            'Ruta por defecto que los instaladores (.msi / .exe) proponen al instalar software de 64 bits. Útil cambiarla a otro disco (ej. D:\\Programas) cuando el SSD principal es pequeño.',
+                            'Ruta por defecto que los instaladores (.msi / .exe) proponen al instalar software de 64 bits (es el origen de %ProgramFiles%). Ojo: Microsoft NO admite cambiarla en un equipo ya instalado; puede romper Windows Update y las actualizaciones de versión. En la práctica real se elige la ruta en cada instalador.',
                           allowedGuide: [
                             { value: 'C:\\Program Files', label: 'Ruta estándar en disco del sistema C:', impact: 'nominal' },
-                            { value: 'D:\\Programas', label: 'Disco secundario D:\\Programas (Ahorra espacio en C:)', impact: 'nominal' }
+                            { value: 'D:\\Programas', label: 'Disco secundario D:\\Programas (no admitido por Microsoft: solo en laboratorio)', impact: 'warning' }
                           ]
                         },
                         {
@@ -562,7 +584,7 @@ export const INITIAL_REGISTRY_TREE: RegistryKeyNode = {
                           description: 'Ruta por defecto para aplicaciones de 32 bits (arquitectura x86 sobre Windows de 64 bits).',
                           allowedGuide: [
                             { value: 'C:\\Program Files (x86)', label: 'Ruta estándar 32 bits en disco C:', impact: 'nominal' },
-                            { value: 'D:\\Programas (x86)', label: 'Disco secundario D:\\Programas (x86)', impact: 'nominal' }
+                            { value: 'D:\\Programas (x86)', label: 'Disco secundario D:\\Programas (x86) (no admitido por Microsoft)', impact: 'warning' }
                           ]
                         },
                         {
@@ -598,7 +620,7 @@ export const INITIAL_REGISTRY_TREE: RegistryKeyNode = {
                               id: 'hklm-run-audio',
                               name: 'RtkAudUService',
                               type: 'REG_SZ',
-                              data: '"C:\\Program Files\\Realtek\\Audio\\HDA\\RtkAudUService64.exe" -background',
+                              data: '"C:\\Windows\\System32\\RtkAudUService64.exe" -background',
                               description: 'Servicio de panel de control de audio Realtek.'
                             },
                             {
@@ -636,11 +658,11 @@ export const INITIAL_REGISTRY_TREE: RegistryKeyNode = {
                                   name: 'EnableLUA',
                                   type: 'REG_DWORD',
                                   data: '1',
-                                  description: 'Habilita o deshabilita el Control de Cuentas de Usuario (UAC). Ponerlo a 0 desactiva la protección de elevación de privilegios.',
+                                  description: 'Habilita o deshabilita el Control de Cuentas de Usuario (UAC). Con 0 (tras reiniciar) las cuentas de administrador ejecutan todo con el token completo sin preguntar, los usuarios estándar no reciben la petición de elevación y las apps de la Microsoft Store dejan de abrirse.',
                                   isSystemCritical: true,
                                   allowedGuide: [
                                     { value: '1', label: 'UAC Habilitado (Protección activa contra elevación silenciosa)', impact: 'nominal' },
-                                    { value: '0', label: 'UAC Desactivado (Peligro: Todo corre con privilegios elevados sin aviso)', impact: 'danger' }
+                                    { value: '0', label: 'UAC Desactivado (Peligro: los administradores corren todo elevado sin aviso)', impact: 'danger' }
                                   ]
                                 },
                                 {
@@ -729,18 +751,31 @@ export const INITIAL_REGISTRY_TREE: RegistryKeyNode = {
                                 { value: '0', label: 'Desactivar Inicio Rápido (Apagado real limpio, ideal para Dual-Boot Linux y diagnóstico)', impact: 'nominal' },
                                 { value: '1', label: 'Inicio Rápido habilitado (Hiberna el kernel al apagar; bloquea NTFS en Dual-Boot)', impact: 'warning' }
                               ]
-                            },
-                            {
-                              id: 'hklm-pwr-hibernate',
-                              name: 'HibernateEnabled',
-                              type: 'REG_DWORD',
-                              data: '1',
-                              description: 'Habilita o deshabilita el soporte general de hibernación (archivo C:\\hiberfil.sys).'
                             }
                           ],
                           children: []
                         }
                       ]
+                    },
+                    {
+                      name: 'Power',
+                      path: 'Equipo\\HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Power',
+                      hive: 'HKLM',
+                      scopeLabel: 'Hibernación y planes de energía del equipo',
+                      description:
+                        'Ajustes globales de energía. No confundir con Session Manager\\Power, donde vive el Inicio Rápido.',
+                      values: [
+                        { id: 'hklm-cpwr-def', name: '(Predeterminado)', type: 'REG_SZ', data: '', isDefault: true },
+                        {
+                          id: 'hklm-pwr-hibernate',
+                          name: 'HibernateEnabled',
+                          type: 'REG_DWORD',
+                          data: '1',
+                          description:
+                            'Soporte general de hibernación (archivo C:\\hiberfil.sys). El Inicio Rápido depende de él: «powercfg /h off» lo pone a 0 y desactiva a la vez la hibernación y el Inicio Rápido.'
+                        }
+                      ],
+                      children: []
                     },
                     {
                       name: 'FileSystem',
@@ -756,7 +791,7 @@ export const INITIAL_REGISTRY_TREE: RegistryKeyNode = {
                           type: 'REG_DWORD',
                           data: '0',
                           description:
-                            'Elimina la limitación histórica de 260 caracteres (MAX_PATH) en rutas de archivos de Windows. Imprescindible para desarrolladores (Node.js, Git, Python) y servidores de archivos con estructuras profundas.',
+                            'Elimina la limitación histórica de 260 caracteres (MAX_PATH) en las API de archivos de Windows 10 (1607) y posteriores. Solo lo aprovechan las aplicaciones declaradas «longPathAware» (Node.js, Python, PowerShell 7…); el Explorador y muchos programas antiguos mantienen el límite, y Git necesita además core.longpaths=true.',
                           allowedGuide: [
                             { value: '0', label: 'Límite clásico de 260 caracteres activo (Puede fallar en rutas largas)', impact: 'warning' },
                             { value: '1', label: 'Rutas largas habilitadas (Hasta 32.767 caracteres en NTFS)', impact: 'nominal' }
@@ -984,12 +1019,7 @@ export const DIDACTIC_MISSIONS: MissionScenario[] = [
     targetValueName: 'HiberbootEnabled',
     hint: 'Navega a HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Power, haz doble clic en HiberbootEnabled y cambia su información del valor a 0.',
     expectedSummary: 'HiberbootEnabled = 0 (REG_DWORD)',
-    checkCompleted: (root) =>
-      getValueData(
-        root,
-        'Equipo\\HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Power',
-        'HiberbootEnabled'
-      ) === '0'
+    checkCompleted: (root) => !isFastStartupActive(root)
   },
   {
     id: 'mission-startup-malware',
@@ -1004,20 +1034,18 @@ export const DIDACTIC_MISSIONS: MissionScenario[] = [
       'El malware sin permisos de Administrador no puede escribir en HKLM\\...\\Run (global), así que se inyecta en HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run (exclusivo del usuario actual).',
     targetPath: 'Equipo\\HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run',
     targetValueName: 'CryptoMinerUpdater',
-    hint: 'Ve a HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run y elimina el valor "CryptoMinerUpdater" (o vacía su ruta). Conserva SecurityHealth intacto en HKLM.',
+    hint: 'Ve a HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run y elimina el valor "CryptoMinerUpdater". Cambiarle el nombre no sirve: Windows ejecuta la ruta, no el nombre. Conserva SecurityHealth intacto en HKLM.',
     expectedSummary: 'Eliminar CryptoMinerUpdater en HKCU\\...\\Run',
     checkCompleted: (root) => {
-      const minerVal = getValueData(
-        root,
-        'Equipo\\HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run',
-        'CryptoMinerUpdater'
-      );
       const defenderVal = getValueData(
         root,
         'Equipo\\HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run',
         'SecurityHealth'
       );
-      return (minerVal === undefined || minerVal.trim() === '') && Boolean(defenderVal);
+      return (
+        !isMinerActive(root) &&
+        Boolean(defenderVal?.toLowerCase().includes('securityhealthsystray.exe'))
+      );
     }
   },
   {
@@ -1052,7 +1080,7 @@ export const DIDACTIC_MISSIONS: MissionScenario[] = [
     symptom:
       'El disco C: es un SSD de poca capacidad casi lleno y el equipo cuenta con un segundo disco rápido en D:. Configura Windows para que todos los instaladores de 64 bits propongan instalar en "D:\\Programas" por defecto.',
     didacticExplanation:
-      'La ubicación de archivos de programa es compartida por todo el sistema operativo, por lo que se almacena en HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion bajo el valor ProgramFilesDir.',
+      'La ubicación de archivos de programa es compartida por todo el sistema operativo, por lo que se almacena en HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion bajo el valor ProgramFilesDir. Aviso: Microsoft no admite cambiarla en un Windows real (puede romper Windows Update); aquí se practica para localizar la clave, pero en producción se elige la ruta en cada instalador.',
     targetPath: 'Equipo\\HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion',
     targetValueName: 'ProgramFilesDir',
     hint: 'Abre HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion y cambia el valor de cadena "ProgramFilesDir" a D:\\Programas',
@@ -1063,7 +1091,8 @@ export const DIDACTIC_MISSIONS: MissionScenario[] = [
         'Equipo\\HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion',
         'ProgramFilesDir'
       );
-      return val?.toLowerCase() === 'd:\\programas' || val?.toLowerCase() === 'd:\\program files';
+      const normalized = val?.trim().replace(/\\+$/, '').toLowerCase();
+      return normalized === 'd:\\programas' || normalized === 'd:\\program files';
     }
   },
   {
@@ -1118,7 +1147,7 @@ export const DIDACTIC_MISSIONS: MissionScenario[] = [
     title: 'Habilitar Rutas Largas NTFS (>260 caracteres) y Bloq Num en Login',
     category: 'Almacenamiento y Rutas',
     difficulty: 'Avanzado',
-    hiveFocus: 'HKLM',
+    hiveFocus: 'HKLM + HKU',
     symptom:
       'Al clonar repositorios profundos o restaurar copias de seguridad aparece el error de ruta demasiado larga (MAX_PATH 260 caracteres). Además, se pide que el teclado numérico (Bloq Num) esté activo antes de iniciar sesión.',
     didacticExplanation:

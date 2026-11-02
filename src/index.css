@@ -15,6 +15,11 @@
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
   }
+
+  /* Las rutas del Registro no tienen espacios: sin esto desbordan en móvil */
+  p, li, h3, h4 {
+    overflow-wrap: anywhere;
+  }
 }
 
 .tabular-nums {

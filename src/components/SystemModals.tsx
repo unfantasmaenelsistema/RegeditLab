@@ -15,45 +15,12 @@ import {
   Play,
 } from 'lucide-react';
 import { RegistryKeyNode } from '../types/registry';
-import { getValueData } from '../data/initialRegistry';
+import { getValueData, isFastStartupActive, isMinerActive } from '../data/initialRegistry';
+import { generateRegFileContent } from '../engine/registryEngine';
 
 interface RegExportModalProps {
   node: RegistryKeyNode | null;
   onClose: () => void;
-}
-
-export function generateRegFileContent(node: RegistryKeyNode): string {
-  const lines: string[] = ['Windows Registry Editor Version 5.00', ''];
-
-  function serializeNode(current: RegistryKeyNode) {
-    if (current.path !== 'Equipo') {
-      const cleanPath = current.path.replace(/^Equipo\\/, '');
-      lines.push(`[${cleanPath}]`);
-      for (const val of current.values) {
-        if (val.isDefault && !val.data) continue;
-        const namePart = val.isDefault ? '@' : `"${val.name.replace(/"/g, '\\"')}"`;
-        if (val.type === 'REG_DWORD') {
-          const num = parseInt(val.data, 10);
-          const hex = (isNaN(num) ? 0 : num >>> 0).toString(16).padStart(8, '0');
-          lines.push(`${namePart}=dword:${hex}`);
-        } else if (val.type === 'REG_SZ') {
-          const escaped = val.data.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-          lines.push(`${namePart}="${escaped}"`);
-        } else {
-          const escaped = val.data.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-          lines.push(`; Tipo ${val.type}`);
-          lines.push(`${namePart}="${escaped}"`);
-        }
-      }
-      lines.push('');
-    }
-    for (const child of current.children) {
-      serializeNode(child);
-    }
-  }
-
-  serializeNode(node);
-  return lines.join('\r\n');
 }
 
 export const RegExportModal: React.FC<RegExportModalProps> = ({ node, onClose }) => {
@@ -64,17 +31,25 @@ export const RegExportModal: React.FC<RegExportModalProps> = ({ node, onClose })
   const regContent = generateRegFileContent(node);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(regContent);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    navigator.clipboard
+      ?.writeText(regContent)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => {
+        // Portapapeles no disponible (contexto no seguro o permiso denegado)
+      });
   };
 
+  // Se descarga como .txt: un .reg con datos ficticios (DisableTaskMgr=1, la entrada
+  // del minero…) se importaría al registro real con un simple doble clic.
   const handleDownload = () => {
-    const blob = new Blob([regContent], { type: 'text/plain;charset=utf-8' });
+    const blob = new Blob(['﻿' + regContent], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${node.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.reg`;
+    a.download = `${node.name.replace(/[^a-zA-Z0-9_-]/g, '_')}_simulador.reg.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -106,18 +81,21 @@ export const RegExportModal: React.FC<RegExportModalProps> = ({ node, onClose })
 
         <div className="p-4 space-y-3">
           <p className="text-xs text-slate-600">
-            Así es como Windows serializa esta rama en un script <code className="font-mono text-slate-900">.reg</code> para automatizar despliegues o copias de seguridad:
+            Así serializa <code className="font-mono text-slate-900">regedit.exe</code> esta rama al exportarla (<code className="font-mono">dword:</code> para DWORD, <code className="font-mono">hex(2):</code> expandible, <code className="font-mono">hex(7):</code> cadena múltiple, <code className="font-mono">hex(b):</code> QWORD y <code className="font-mono">hex:</code> binario, en UTF-16LE little-endian):
+          </p>
+          <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5">
+            Los datos del simulador son ficticios. Por seguridad se descarga como <code className="font-mono">.reg.txt</code>: así un doble clic lo abre en el Bloc de notas y no lo importa en tu Windows real.
           </p>
 
           <pre className="max-h-80 overflow-auto rounded border border-slate-200 bg-slate-950 p-3.5 text-xs font-mono text-emerald-400 leading-relaxed">
             {regContent}
           </pre>
 
-          <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200">
             <span className="text-[11px] font-mono text-slate-500">
               Cabecera estándar: Windows Registry Editor Version 5.00
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={handleCopy}
@@ -132,7 +110,7 @@ export const RegExportModal: React.FC<RegExportModalProps> = ({ node, onClose })
                 className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-white bg-sky-600 rounded hover:bg-sky-700 transition-colors whitespace-nowrap shrink-0"
               >
                 <Download className="h-3.5 w-3.5" />
-                Descargar .reg
+                Descargar .reg.txt
               </button>
             </div>
           </div>
@@ -155,12 +133,7 @@ export const BootSimulatorModal: React.FC<BootSimulatorModalProps> = ({
 }) => {
   const [activeActionOutput, setActiveActionOutput] = useState<string | null>(null);
 
-  const hiberboot =
-    getValueData(
-      root,
-      'Equipo\\HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Power',
-      'HiberbootEnabled'
-    ) ?? '1';
+  const fastStartup = isFastStartupActive(root);
   const usbStart =
     getValueData(
       root,
@@ -197,11 +170,9 @@ export const BootSimulatorModal: React.FC<BootSimulatorModalProps> = ({
       'Equipo\\HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced',
       'HideFileExt'
     ) ?? '1';
-  const minerVal = getValueData(
-    root,
-    'Equipo\\HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run',
-    'CryptoMinerUpdater'
-  );
+  const minerActive = isMinerActive(root);
+  // Cualquier valor distinto de 0 activa la directiva, no solo el 1
+  const taskMgrBlocked = disableTaskMgr !== '0';
   const enableLua =
     getValueData(
       root,
@@ -260,10 +231,10 @@ export const BootSimulatorModal: React.FC<BootSimulatorModalProps> = ({
                       onClose();
                     }}
                     className={`font-mono font-medium hover:underline ${
-                      hiberboot === '0' ? 'text-emerald-700' : 'text-amber-700'
+                      !fastStartup ? 'text-emerald-700' : 'text-amber-700'
                     }`}
                   >
-                    {hiberboot === '0' ? '● 0 (Arranque Limpio / Dual-Boot OK)' : '▲ 1 (Inicio Rápido Híbrido)'}
+                    {!fastStartup ? '● Desactivado (Apagado completo / Dual-Boot OK)' : '▲ Activo (Apagado híbrido)'}
                   </button>
                 </div>
                 <div className="flex items-center justify-between py-1">
@@ -303,7 +274,7 @@ export const BootSimulatorModal: React.FC<BootSimulatorModalProps> = ({
                 <div className="flex items-center justify-between py-1">
                   <span className="text-slate-600">Bloq Num en Login (HKEY_USERS\.DEFAULT):</span>
                   <span className="font-mono font-medium text-slate-800">
-                    {numLock === '2' ? '● 2 (Activado al encender)' : '○ 0 (Apagado en login)'}
+                    {numLock === '2' ? '● 2 (Activado al encender)' : `○ ${numLock} (Apagado en login)`}
                   </span>
                 </div>
               </div>
@@ -344,7 +315,7 @@ export const BootSimulatorModal: React.FC<BootSimulatorModalProps> = ({
               <div className="space-y-1.5 text-xs">
                 <div className="flex items-center justify-between py-1 border-b border-slate-200/70">
                   <span className="text-slate-600">Estado de Inicio (HKCU\...\Run):</span>
-                  {minerVal ? (
+                  {minerActive ? (
                     <span className="font-mono font-medium text-red-700 flex items-center gap-1">
                       <ShieldAlert className="h-3.5 w-3.5" /> ¡Malware miner_svc.exe activo!
                     </span>
@@ -356,8 +327,8 @@ export const BootSimulatorModal: React.FC<BootSimulatorModalProps> = ({
                 </div>
                 <div className="flex items-center justify-between py-1">
                   <span className="text-slate-600">Administrador de Tareas:</span>
-                  <span className={`font-mono font-medium ${disableTaskMgr === '1' ? 'text-red-700' : 'text-emerald-700'}`}>
-                    {disableTaskMgr === '1' ? '▲ Bloqueado (DisableTaskMgr=1)' : '● Habilitado (DisableTaskMgr=0)'}
+                  <span className={`font-mono font-medium ${taskMgrBlocked ? 'text-red-700' : 'text-emerald-700'}`}>
+                    {taskMgrBlocked ? `▲ Bloqueado (DisableTaskMgr=${disableTaskMgr})` : '● Habilitado (sin directiva)'}
                   </span>
                 </div>
               </div>
@@ -392,8 +363,8 @@ export const BootSimulatorModal: React.FC<BootSimulatorModalProps> = ({
                 type="button"
                 onClick={() =>
                   setActiveActionOutput(
-                    disableTaskMgr === '1'
-                      ? '❌ [ERROR DE DIRECTIVA HKCU]: "El administrador ha deshabilitado el Administrador de tareas" (DisableTaskMgr = 1 en HKCU\\...\\Policies\\System).'
+                    taskMgrBlocked
+                      ? `❌ [ERROR DE DIRECTIVA HKCU]: "El administrador ha deshabilitado el Administrador de tareas" (DisableTaskMgr = ${disableTaskMgr} en HKCU\\...\\Policies\\System).`
                       : '✅ [TASKMGR.EXE]: Administrador de Tareas abierto correctamente. Procesos visibles.'
                   )
                 }
