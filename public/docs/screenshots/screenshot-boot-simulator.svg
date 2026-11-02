@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 440" width="100%" height="100%">
+  <defs>
+    <style>
+      .sans { font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif; }
+      .mono { font-family: 'IBM Plex Mono', Consolas, monospace; }
+    </style>
+  </defs>
+
+  <rect width="900" height="440" fill="#0f172a" rx="10" />
+
+  <!-- Modal Window -->
+  <rect x="30" y="24" width="840" height="392" rx="6" fill="#ffffff" stroke="#475569" />
+  <path d="M30 30 a6 6 0 0 1 6 -6 h828 a6 6 0 0 1 6 6 v32 h-840 z" fill="#0f172a" />
+  <text x="52" y="45" fill="#38bdf8" font-size="13" font-weight="700" class="sans">▶ Simulador de Secuencia de Arranque y Comportamiento de Windows en Vivo</text>
+
+  <!-- 4 Boot Phase Cards -->
+  <rect x="50" y="74" width="390" height="92" rx="5" fill="#f8fafc" stroke="#cbd5e1" />
+  <text x="64" y="95" fill="#0f172a" font-size="11.5" font-weight="700" class="sans">1. Fase Kernel y Sistema de Archivos (HKLM\SYSTEM)</text>
+  <text x="64" y="118" fill="#475569" font-size="11" class="sans">Modo de Inicio (HiberbootEnabled):</text>
+  <text x="275" y="118" fill="#047857" font-size="11" font-weight="700" class="mono">● 0 (Arranque Limpio OK)</text>
+  <text x="64" y="142" fill="#475569" font-size="11" class="sans">Rutas Largas NTFS (LongPathsEnabled):</text>
+  <text x="275" y="142" fill="#047857" font-size="11" font-weight="700" class="mono">● 1 (Hasta 32.767 chars)</text>
+
+  <rect x="460" y="74" width="390" height="92" rx="5" fill="#f8fafc" stroke="#cbd5e1" />
+  <text x="474" y="95" fill="#0f172a" font-size="11.5" font-weight="700" class="sans">2. Controladores de Dispositivo (HKLM\...\Services)</text>
+  <text x="474" y="118" fill="#475569" font-size="11" class="sans">Driver USBSTOR.SYS (Start):</text>
+  <text x="670" y="118" fill="#047857" font-size="11" font-weight="700" class="mono">● 4 (Pendrives Bloqueados)</text>
+  <text x="474" y="142" fill="#475569" font-size="11" class="sans">Bloq Num en Login (HKEY_USERS):</text>
+  <text x="670" y="142" fill="#047857" font-size="11" font-weight="700" class="mono">● 2 (Activado al encender)</text>
+
+  <rect x="50" y="178" width="390" height="86" rx="5" fill="#f8fafc" stroke="#cbd5e1" />
+  <text x="64" y="199" fill="#0f172a" font-size="11.5" font-weight="700" class="sans">3. Configuración Global (HKLM\SOFTWARE)</text>
+  <text x="64" y="222" fill="#475569" font-size="11" class="sans">Ruta Instalación 64-bit:</text>
+  <text x="295" y="222" fill="#0f172a" font-size="11" font-weight="700" class="mono">D:\Programas</text>
+  <text x="64" y="244" fill="#475569" font-size="11" class="sans">Control Cuentas Usuario (EnableLUA):</text>
+  <text x="295" y="244" fill="#047857" font-size="11" font-weight="700" class="mono">● 1 (UAC Protegido)</text>
+
+  <rect x="460" y="178" width="390" height="86" rx="5" fill="#f8fafc" stroke="#cbd5e1" />
+  <text x="474" y="199" fill="#0f172a" font-size="11.5" font-weight="700" class="sans">4. Sesión del Usuario Activo (HKEY_CURRENT_USER)</text>
+  <text x="474" y="222" fill="#475569" font-size="11" class="sans">Estado de Inicio (HKCU\...\Run):</text>
+  <text x="670" y="222" fill="#047857" font-size="11" font-weight="700" class="mono">✓ Inicio limpio sin malware</text>
+  <text x="474" y="244" fill="#475569" font-size="11" class="sans">Administrador de Tareas:</text>
+  <text x="670" y="244" fill="#047857" font-size="11" font-weight="700" class="mono">● Habilitado (DisableTaskMgr=0)</text>
+
+  <!-- Interactive OS Testbench Console -->
+  <rect x="50" y="278" width="800" height="122" rx="6" fill="#0f172a" />
+  <text x="66" y="298" fill="#38bdf8" font-size="11.5" font-weight="700" class="sans">Banco de Pruebas del Sistema Operativo (Prueba tus ajustes en tiempo real)</text>
+
+  <rect x="66" y="308" width="160" height="26" rx="4" fill="#1e293b" stroke="#334155" />
+  <text x="80" y="325" fill="#ffffff" font-size="10.5" font-weight="600" class="sans">Conectar Pendrive USB</text>
+
+  <rect x="234" y="308" width="215" height="26" rx="4" fill="#1e293b" stroke="#334155" />
+  <text x="248" y="325" fill="#ffffff" font-size="10.5" font-weight="600" class="sans">Abrir Administrador de Tareas</text>
+
+  <rect x="457" y="308" width="220" height="26" rx="4" fill="#1e293b" stroke="#334155" />
+  <text x="470" y="325" fill="#ffffff" font-size="10.5" font-weight="600" class="sans">Inspeccionar Factura.pdf.exe</text>
+
+  <rect x="66" y="344" width="768" height="44" rx="4" fill="#020617" stroke="#1e293b" />
+  <text x="78" y="363" fill="#7dd3fc" font-size="11" class="mono">🛑 [KERNEL USBSTOR.SYS]: Dispositivo USB detectado, pero el servicio tiene Start = 4 (Deshabilitado).</text>
+  <text x="78" y="380" fill="#7dd3fc" font-size="11" class="mono">Windows ha bloqueado el montaje de la unidad E:\. Teclado y ratón USB siguen operativos.</text>
+</svg>

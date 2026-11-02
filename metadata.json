@@ -1,0 +1,6 @@
+{
+  "name": "Simulador de Regedit - Un Fantasma en el Sistema",
+  "description": "Simulador interactivo y didáctico del Editor del Registro de Windows (regedit.exe) para aprender administración de sistemas, arranque, seguridad y jerarquía HKLM vs HKCU.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

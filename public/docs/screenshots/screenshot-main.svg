@@ -1,0 +1,198 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" width="100%" height="100%">
+  <defs>
+    <style>
+      .sans { font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif; }
+      .mono { font-family: 'IBM Plex Mono', Consolas, monospace; }
+    </style>
+  </defs>
+
+  <!-- App Background -->
+  <rect width="1200" height="680" fill="#f8fafc" rx="10" />
+
+  <!-- Top Header Bar -->
+  <rect x="0" y="0" width="1200" height="54" fill="#ffffff" />
+  <line x1="0" y1="54" x2="1200" y2="54" stroke="#e2e8f0" stroke-width="1" />
+  <circle cx="34" cy="27" r="13" fill="#0f172a" />
+  <text x="30" y="31" fill="#38bdf8" font-size="11" font-weight="bold" class="mono">👻</text>
+  <text x="56" y="32" fill="#0f172a" font-size="15" font-weight="700" class="sans">RegEdit Lab · Un Fantasma en el Sistema</text>
+
+  <text x="430" y="32" fill="#0284c7" font-size="12" font-weight="600" class="sans">Simulador Regedit</text>
+  <line x1="430" y1="42" x2="535" y2="42" stroke="#0284c7" stroke-width="2" />
+  <text x="565" y="32" fill="#475569" font-size="12" font-weight="600" class="sans">Casos Prácticos (5/7)</text>
+  <text x="710" y="32" fill="#475569" font-size="12" font-weight="600" class="sans">HKLM vs HKCU</text>
+  <text x="820" y="32" fill="#475569" font-size="12" font-weight="600" class="sans">Guía de Tipos y Claves</text>
+
+  <rect x="985" y="13" width="190" height="28" rx="5" fill="#0f172a" />
+  <text x="1002" y="31" fill="#ffffff" font-size="11" font-weight="600" class="sans">Web Un Fantasma en el Sistema ↗</text>
+
+  <!-- LEFT ZONE: Windows Regedit Window (x=24, y=72, w=775, h=580) -->
+  <rect x="24" y="72" width="775" height="580" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+
+  <!-- Regedit Native Dark Title Bar -->
+  <path d="M24 78 a6 6 0 0 1 6 -6 h763 a6 6 0 0 1 6 6 v30 h-775 z" fill="#0f172a" />
+  <rect x="38" y="83" width="6" height="6" fill="#38bdf8" />
+  <rect x="46" y="83" width="6" height="6" fill="#0284c7" />
+  <rect x="38" y="91" width="6" height="6" fill="#0369a1" />
+  <rect x="46" y="91" width="6" height="6" fill="#7dd3fc" />
+  <text x="62" y="94" fill="#ffffff" font-size="12" font-weight="600" class="sans">Editor del Registro (regedit.exe) — Administrador</text>
+
+  <rect x="605" y="79" width="182" height="22" rx="4" fill="#0284c7" />
+  <text x="618" y="94" fill="#ffffff" font-size="10.5" font-weight="600" class="sans">▶ Simular Reinicio / Probar Sistema</text>
+
+  <!-- Menu Bar -->
+  <rect x="25" y="108" width="773" height="28" fill="#f1f5f9" />
+  <line x1="24" y1="136" x2="799" y2="136" stroke="#e2e8f0" />
+  <text x="38" y="126" fill="#334155" font-size="11" font-weight="500" class="sans">Archivo</text>
+  <text x="90" y="126" fill="#334155" font-size="11" font-weight="500" class="sans">Edición</text>
+  <text x="145" y="126" fill="#0284c7" font-size="11" font-weight="600" class="sans">★ Favoritos Didácticos</text>
+  <text x="278" y="126" fill="#64748b" font-size="11" class="sans">Expandir árbol</text>
+
+  <rect x="572" y="112" width="82" height="20" rx="3" fill="#ffffff" stroke="#cbd5e1" />
+  <text x="582" y="125" fill="#334155" font-size="10.5" font-weight="500" class="sans">+ Nuevo Valor</text>
+  <rect x="660" y="112" width="82" height="20" rx="3" fill="#ffffff" stroke="#cbd5e1" />
+  <text x="670" y="125" fill="#334155" font-size="10.5" font-weight="500" class="sans">+ Nueva Clave</text>
+  <rect x="748" y="112" width="42" height="20" rx="3" fill="#ffffff" stroke="#cbd5e1" />
+  <text x="757" y="125" fill="#334155" font-size="10.5" font-weight="600" class="mono">.reg</text>
+
+  <!-- Address & Search Bar -->
+  <rect x="25" y="137" width="773" height="36" fill="#f8fafc" />
+  <line x1="24" y1="173" x2="799" y2="173" stroke="#e2e8f0" />
+  <text x="36" y="159" fill="#64748b" font-size="11" class="mono">Ruta:</text>
+  <rect x="72" y="143" width="465" height="24" rx="3" fill="#ffffff" stroke="#cbd5e1" />
+  <text x="80" y="159" fill="#0f172a" font-size="11" class="mono">Equipo\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\USBSTOR</text>
+
+  <rect x="548" y="143" width="240" height="24" rx="3" fill="#ffffff" stroke="#0284c7" />
+  <text x="560" y="159" fill="#64748b" font-size="11" class="sans">🔍 Buscar clave o valor (USBSTOR)...</text>
+
+  <!-- Scope Banner -->
+  <rect x="25" y="174" width="773" height="30" fill="#f1f5f9" />
+  <line x1="24" y1="204" x2="799" y2="204" stroke="#e2e8f0" />
+  <text x="38" y="193" fill="#0f172a" font-size="11" font-weight="600" class="sans">🖴 Driver de Almacenamiento Masivo USB (Pendrives y Discos Externos) · Ámbito Global HKLM</text>
+
+  <!-- Tree Pane (Left) & Values Pane (Right) -->
+  <line x1="315" y1="204" x2="315" y2="625" stroke="#e2e8f0" />
+
+  <!-- Tree Nodes -->
+  <g class="mono" font-size="11" fill="#334155">
+    <text x="36" y="226">▾ 📁 Equipo</text>
+    <text x="50" y="246">▸ 📁 HKEY_CLASSES_ROOT</text>
+    <text x="50" y="266">▾ 📁 HKEY_CURRENT_USER</text>
+    <text x="66" y="286">▸ 📁 Control Panel</text>
+    <text x="66" y="306">▾ 📁 Software\Microsoft\Windows</text>
+    <text x="82" y="326">▸ 📁 Run</text>
+    <text x="82" y="346">▸ 📁 Explorer\Advanced</text>
+    <text x="82" y="366">▸ 📁 Policies\System</text>
+    <text x="50" y="390" font-weight="600" fill="#0f172a">▾ 📁 HKEY_LOCAL_MACHINE</text>
+    <text x="66" y="410">▸ 📁 HARDWARE\DESCRIPTION</text>
+    <text x="66" y="430">▾ 📁 SOFTWARE\Microsoft\Windows</text>
+    <text x="82" y="450">▸ 📁 CurrentVersion\Run</text>
+    <text x="66" y="470">▾ 📁 SYSTEM\CurrentControlSet</text>
+    <text x="82" y="490">▾ 📁 Control\Session Manager</text>
+    <text x="98" y="510">📁 Power</text>
+    <text x="82" y="530">▾ 📁 Services</text>
+  </g>
+  <!-- Highlighted Pulsing Tree Node -->
+  <rect x="26" y="538" width="288" height="24" fill="#0284c7" stroke="#fbbf24" stroke-width="2" />
+  <text x="98" y="554" fill="#ffffff" font-size="11" font-weight="700" class="mono">📂 USBSTOR</text>
+  <text x="230" y="554" fill="#fde047" font-size="9.5" font-weight="700" class="mono">● LOCALIZADO</text>
+
+  <g class="mono" font-size="11" fill="#334155">
+    <text x="50" y="580">▸ 📁 HKEY_USERS</text>
+    <text x="50" y="600">▸ 📁 HKEY_CURRENT_CONFIG</text>
+  </g>
+
+  <!-- Values Table Header -->
+  <rect x="316" y="205" width="482" height="26" fill="#f8fafc" />
+  <line x1="316" y1="231" x2="799" y2="231" stroke="#e2e8f0" />
+  <text x="328" y="222" fill="#475569" font-size="11" font-weight="600" class="sans">Nombre</text>
+  <text x="465" y="222" fill="#475569" font-size="11" font-weight="600" class="sans">Tipo</text>
+  <text x="565" y="222" fill="#475569" font-size="11" font-weight="600" class="sans">Datos</text>
+  <text x="740" y="222" fill="#475569" font-size="11" font-weight="600" class="sans">Acción</text>
+
+  <!-- Row 1 -->
+  <text x="328" y="252" fill="#334155" font-size="11" class="mono">[ab] (Predeterminado)</text>
+  <text x="465" y="252" fill="#64748b" font-size="10.5" class="mono">REG_SZ</text>
+  <text x="565" y="252" fill="#64748b" font-size="11" class="mono">(valor no establecido)</text>
+
+  <!-- Row 2 -->
+  <line x1="316" y1="262" x2="799" y2="262" stroke="#f1f5f9" />
+  <text x="328" y="282" fill="#334155" font-size="11" class="mono">[ab] DisplayName</text>
+  <text x="465" y="282" fill="#64748b" font-size="10.5" class="mono">REG_SZ</text>
+  <text x="565" y="282" fill="#334155" font-size="11" class="mono">Dispositivo USB</text>
+
+  <!-- Row 3 -->
+  <line x1="316" y1="292" x2="799" y2="292" stroke="#f1f5f9" />
+  <text x="328" y="312" fill="#334155" font-size="11" class="mono">[ab] ImagePath</text>
+  <text x="465" y="312" fill="#64748b" font-size="10.5" class="mono">REG_EXPAND_SZ</text>
+  <text x="565" y="312" fill="#334155" font-size="11" class="mono">System32\drivers\USBSTOR.SYS</text>
+
+  <!-- Row 4: Selected Target Value Start -->
+  <rect x="316" y="322" width="482" height="32" fill="#e0f2fe" />
+  <text x="328" y="342" fill="#0f172a" font-size="11" font-weight="700" class="mono">[010] Start ★ Objetivo</text>
+  <text x="465" y="342" fill="#0369a1" font-size="10.5" font-weight="600" class="mono">REG_DWORD</text>
+  <text x="565" y="342" fill="#0f172a" font-size="11" font-weight="700" class="mono">0x00000004 (4)</text>
+  <rect x="725" y="328" width="62" height="20" rx="3" fill="#0284c7" />
+  <text x="733" y="341" fill="#ffffff" font-size="10" font-weight="600" class="sans">Modificar</text>
+
+  <!-- Bottom Didactic Inspector -->
+  <rect x="316" y="515" width="482" height="110" fill="#f8fafc" />
+  <line x1="316" y1="515" x2="799" y2="515" stroke="#e2e8f0" />
+  <text x="328" y="535" fill="#0284c7" font-size="11" font-weight="700" class="sans">ℹ Explicación Didáctica de la Clave y Valor Activo (Start)</text>
+  <text x="328" y="555" fill="#334155" font-size="11" class="sans">Modo de inicio del driver USBSTOR.SYS en el kernel:</text>
+  <text x="328" y="573" fill="#334155" font-size="11" class="sans">• Valor 3 = Manual (Habilitado al conectar un pendrive).</text>
+  <text x="328" y="591" fill="#047857" font-size="11" font-weight="600" class="sans">• Valor 4 = Deshabilitado (Bloquea memorias USB manteniendo teclado/ratón).</text>
+
+  <!-- Regedit Status Bar -->
+  <rect x="25" y="625" width="773" height="26" fill="#f1f5f9" />
+  <line x1="24" y1="625" x2="799" y2="625" stroke="#e2e8f0" />
+  <text x="36" y="642" fill="#475569" font-size="10.5" class="mono">Equipo\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\USBSTOR</text>
+  <text x="665" y="642" fill="#475569" font-size="10.5" class="mono">0 subclaves · 5 valores</text>
+
+  <!-- RIGHT ZONE: Didactic Trainer & System Monitor (x=815, y=72, w=361) -->
+  <!-- Card 1: Active Mission -->
+  <rect x="815" y="72" width="361" height="225" rx="6" fill="#ffffff" stroke="#cbd5e1" />
+  <text x="831" y="94" fill="#0284c7" font-size="10.5" font-weight="700" class="mono">Entrenador Práctico (5/7 superados)</text>
+  <text x="831" y="112" fill="#0f172a" font-size="13" font-weight="700" class="sans">Caso 03: Bloquear Memorias USB (USBSTOR)</text>
+  <text x="1065" y="94" fill="#047857" font-size="10.5" font-weight="700" class="mono">✓ ● CASO RESUELTO</text>
+
+  <rect x="831" y="124" width="329" height="122" rx="4" fill="#f8fafc" stroke="#e2e8f0" />
+  <text x="841" y="143" fill="#0f172a" font-size="11" font-weight="600" class="sans">Problema reportado:</text>
+  <text x="841" y="160" fill="#334155" font-size="10.5" class="sans">Impedir que los equipos del aula monten pendrives USB</text>
+  <text x="841" y="176" fill="#334155" font-size="10.5" class="sans">sin desactivar teclados ni ratones USB.</text>
+  <line x1="841" y1="188" x2="1150" y2="188" stroke="#e2e8f0" />
+  <text x="841" y="205" fill="#0f172a" font-size="10.5" font-weight="600" class="sans">Por qué en HKLM:</text>
+  <text x="841" y="221" fill="#475569" font-size="10.5" class="sans">Los drivers del kernel (.sys) son globales para toda la</text>
+  <text x="841" y="236" fill="#475569" font-size="10.5" class="sans">máquina en HKLM\SYSTEM\CurrentControlSet\Services.</text>
+
+  <rect x="831" y="256" width="215" height="28" rx="4" fill="#0284c7" />
+  <text x="875" y="274" fill="#ffffff" font-size="11" font-weight="600" class="sans">Ir a la clave en Regedit</text>
+  <rect x="1054" y="256" width="106" height="28" rx="4" fill="#f1f5f9" stroke="#cbd5e1" />
+  <text x="1084" y="274" fill="#334155" font-size="11" font-weight="500" class="sans">Ver pista</text>
+
+  <!-- Card 2: Live System State -->
+  <rect x="815" y="309" width="361" height="175" rx="6" fill="#ffffff" stroke="#cbd5e1" />
+  <text x="831" y="331" fill="#0f172a" font-size="12" font-weight="700" class="sans">👁 Estado del Equipo Simulado en Tiempo Real</text>
+  <text x="831" y="356" fill="#475569" font-size="11" class="sans">Inicio Rápido (HKLM\...\Power):</text>
+  <text x="1035" y="356" fill="#047857" font-size="11" font-weight="600" class="mono">● 0 (Apagado Limpio)</text>
+  <text x="831" y="378" fill="#475569" font-size="11" class="sans">Puertos USB (USBSTOR\Start):</text>
+  <text x="1035" y="378" fill="#047857" font-size="11" font-weight="600" class="mono">● 4 (Bloqueados DLP)</text>
+  <text x="831" y="400" fill="#475569" font-size="11" class="sans">Sesión Usuario (HKCU\...\Run):</text>
+  <text x="1035" y="400" fill="#047857" font-size="11" font-weight="600" class="mono">✓ Limpio sin malware</text>
+  <text x="831" y="422" fill="#475569" font-size="11" class="sans">Ruta Instalación 64 bits:</text>
+  <text x="1035" y="422" fill="#0f172a" font-size="11" font-weight="600" class="mono">D:\Programas</text>
+  <rect x="831" y="442" width="329" height="28" rx="4" fill="#f1f5f9" stroke="#cbd5e1" />
+  <text x="868" y="460" fill="#0f172a" font-size="11" font-weight="600" class="sans">▶ Abrir Banco de Pruebas de Arranque y Sesión</text>
+
+  <!-- Card 3: Audit Log & Export (.txt / .csv) -->
+  <rect x="815" y="496" width="361" height="156" rx="6" fill="#ffffff" stroke="#cbd5e1" />
+  <text x="831" y="518" fill="#0f172a" font-size="12" font-weight="700" class="sans">🕘 Historial de Operaciones</text>
+  <rect x="831" y="528" width="329" height="24" rx="3" fill="#f8fafc" stroke="#cbd5e1" />
+  <text x="840" y="544" fill="#334155" font-size="10.5" class="sans">Alumno: Juan Pérez - 2º ASIR</text>
+  <text x="831" y="570" fill="#0284c7" font-size="10.5" font-weight="600" class="mono">MODIFICAR Start (3 → 4) · 10:42:18</text>
+  <text x="831" y="588" fill="#0284c7" font-size="10.5" font-weight="600" class="mono">MODIFICAR HiberbootEnabled (1 → 0) · 10:40:05</text>
+
+  <rect x="831" y="610" width="160" height="28" rx="4" fill="#0284c7" />
+  <text x="868" y="628" fill="#ffffff" font-size="11" font-weight="600" class="sans">⬇ Descargar .txt</text>
+  <rect x="999" y="610" width="161" height="28" rx="4" fill="#f1f5f9" stroke="#cbd5e1" />
+  <text x="1036" y="628" fill="#0f172a" font-size="11" font-weight="600" class="sans">⬇ Descargar .csv</text>
+</svg>
