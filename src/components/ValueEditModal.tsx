@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { X, HelpCircle, CheckCircle2, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { RegistryValue, RegistryValueType } from '../types/registry';
+import {
+  isNumericType,
+  normalizeValueData,
+  numericToBase,
+  toBigInt,
+} from '../engine/registryEngine';
 
 interface ValueEditModalProps {
   value: RegistryValue | null;
   keyPath: string;
   onClose: () => void;
-  onSave: (valueId: string, newData: string, newName?: string) => void;
+  /** Devuelve un mensaje de error (p. ej. nombre repetido) o null si se guardó. */
+  onSave: (valueId: string, newData: string, newName?: string) => string | null;
 }
 
 export const ValueEditModal: React.FC<ValueEditModalProps> = ({
@@ -15,16 +22,19 @@ export const ValueEditModal: React.FC<ValueEditModalProps> = ({
   onClose,
   onSave,
 }) => {
-  const [base, setBase] = useState<'hex' | 'dec'>('dec');
+  const [base, setBase] = useState<'hex' | 'dec'>('hex');
   const [inputText, setInputText] = useState('');
   const [nameText, setNameText] = useState('');
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!value) return;
     setNameText(value.name);
-    if (value.type === 'REG_DWORD' || value.type === 'REG_QWORD') {
-      setBase('dec');
-      setInputText(value.data || '0');
+    setSaveError(null);
+    if (isNumericType(value.type)) {
+      // regedit abre los DWORD/QWORD en hexadecimal
+      setBase('hex');
+      setInputText(numericToBase(value.data, 'hex'));
     } else {
       setInputText(value.data);
     }
@@ -32,29 +42,25 @@ export const ValueEditModal: React.FC<ValueEditModalProps> = ({
 
   if (!value) return null;
 
-  const isNumeric = value.type === 'REG_DWORD' || value.type === 'REG_QWORD';
+  const isNumeric = isNumericType(value.type);
+  const parsed = normalizeValueData(value.type, inputText, base);
 
   const handleBaseChange = (newBase: 'hex' | 'dec') => {
     if (newBase === base) return;
-    if (newBase === 'hex') {
-      const decNum = parseInt(inputText, 10);
-      setInputText(isNaN(decNum) ? '0' : (decNum >>> 0).toString(16));
-    } else {
-      const hexNum = parseInt(inputText, 16);
-      setInputText(isNaN(hexNum) ? '0' : String(hexNum >>> 0));
-    }
+    // Con un dato no válido se conserva el texto para que el alumno lo corrija
+    if (parsed.ok) setInputText(numericToBase(parsed.value, newBase));
     setBase(newBase);
-  };
-
-  const getDecimalString = (): string => {
-    if (!isNumeric) return inputText;
-    const parsed = parseInt(inputText, base === 'hex' ? 16 : 10);
-    return isNaN(parsed) ? '0' : String(parsed >>> 0);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(value.id, getDecimalString(), value.isDefault ? undefined : nameText.trim() || value.name);
+    if (!parsed.ok) return;
+    const newName = value.isDefault ? undefined : nameText.trim() || value.name;
+    const error = onSave(value.id, parsed.value, newName);
+    if (error) {
+      setSaveError(error);
+      return;
+    }
     onClose();
   };
 
@@ -75,7 +81,7 @@ export const ValueEditModal: React.FC<ValueEditModalProps> = ({
     }
   })();
 
-  const currentDecValue = getDecimalString();
+  const currentDecValue = parsed.ok ? parsed.value : null;
 
   return (
     <div
@@ -127,9 +133,10 @@ export const ValueEditModal: React.FC<ValueEditModalProps> = ({
               <label className="block text-xs font-medium text-slate-700 mb-1">
                 Información del valor:
               </label>
-              {value.type === 'REG_MULTI_SZ' ? (
+              {value.type === 'REG_MULTI_SZ' || value.type === 'REG_BINARY' ? (
                 <textarea
-                  rows={3}
+                  rows={value.type === 'REG_BINARY' ? 4 : 3}
+                  placeholder={value.type === 'REG_BINARY' ? '00 01 a4 ff' : 'Una cadena por línea'}
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   autoFocus
@@ -144,9 +151,14 @@ export const ValueEditModal: React.FC<ValueEditModalProps> = ({
                   className="w-full rounded border border-sky-600 bg-white px-2.5 py-1.5 text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                 />
               )}
-              {isNumeric && (
+              {isNumeric && currentDecValue !== null && (
                 <p className="mt-1 text-[11px] font-mono text-slate-500 tabular-nums">
-                  Equivalente: 0x{(parseInt(currentDecValue, 10) >>> 0).toString(16).padStart(8, '0')} ({currentDecValue})
+                  Equivalente: 0x{toBigInt(currentDecValue).toString(16).padStart(8, '0')} ({currentDecValue})
+                </p>
+              )}
+              {!parsed.ok && (
+                <p role="alert" className="mt-1 text-[11px] text-red-700">
+                  {parsed.error}
                 </p>
               )}
             </div>
@@ -204,8 +216,8 @@ export const ValueEditModal: React.FC<ValueEditModalProps> = ({
                           key={opt.value}
                           type="button"
                           onClick={() => {
-                            if (isNumeric && base === 'hex') {
-                              setInputText(parseInt(opt.value, 10).toString(16));
+                            if (isNumeric) {
+                              setInputText(numericToBase(opt.value, base));
                             } else {
                               setInputText(opt.value);
                             }
@@ -248,10 +260,17 @@ export const ValueEditModal: React.FC<ValueEditModalProps> = ({
             </div>
           )}
 
+          {saveError && (
+            <p role="alert" className="rounded border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs text-red-800">
+              {saveError}
+            </p>
+          )}
+
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
             <button
               type="submit"
-              className="px-4 py-1.5 text-xs font-medium text-white bg-sky-600 rounded hover:bg-sky-700 transition-colors whitespace-nowrap shrink-0"
+              disabled={!parsed.ok}
+              className="px-4 py-1.5 text-xs font-medium text-white bg-sky-600 rounded hover:bg-sky-700 transition-colors whitespace-nowrap shrink-0 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Aceptar
             </button>
@@ -274,8 +293,14 @@ interface CreateItemModalProps {
   initialValueType?: RegistryValueType;
   keyPath: string;
   onClose: () => void;
-  onCreateKey: (keyName: string, description: string) => void;
-  onCreateValue: (name: string, type: RegistryValueType, data: string, description: string) => void;
+  /** Ambos devuelven un mensaje de error (nombre repetido o no válido) o null si se creó. */
+  onCreateKey: (keyName: string, description: string) => string | null;
+  onCreateValue: (
+    name: string,
+    type: RegistryValueType,
+    data: string,
+    description: string
+  ) => string | null;
 }
 
 export const CreateItemModal: React.FC<CreateItemModalProps> = ({
@@ -290,28 +315,43 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   const [type, setType] = useState<RegistryValueType>(initialValueType);
   const [data, setData] = useState('');
   const [description, setDescription] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     setType(initialValueType);
     setName('');
-    setData(initialValueType === 'REG_DWORD' || initialValueType === 'REG_QWORD' ? '0' : '');
+    setData(isNumericType(initialValueType) ? '0' : '');
     setDescription('');
+    setSubmitError(null);
   }, [mode, initialValueType]);
 
   if (!mode) return null;
 
+  // Los datos numéricos se escriben en decimal o con prefijo 0x
+  const numericBase = /^\s*0x/i.test(data) ? 'hex' : 'dec';
+  const parsed = mode === 'value' ? normalizeValueData(type, data, numericBase) : null;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
+    let error: string | null;
     if (mode === 'key') {
-      onCreateKey(name.trim(), description.trim() || 'Subclave creada por el administrador en el simulador.');
+      error = onCreateKey(
+        name.trim(),
+        description.trim() || 'Subclave creada por el administrador en el simulador.'
+      );
     } else {
-      onCreateValue(
+      if (!parsed || !parsed.ok) return;
+      error = onCreateValue(
         name.trim(),
         type,
-        data,
+        parsed.value,
         description.trim() || `Valor ${type} personalizado creado por el alumno.`
       );
+    }
+    if (error) {
+      setSubmitError(error);
+      return;
     }
     onClose();
   };
@@ -382,13 +422,28 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                 <label className="block text-xs font-medium text-slate-700 mb-1">
                   Información del valor inicial:
                 </label>
-                <input
-                  type="text"
-                  value={data}
-                  onChange={(e) => setData(e.target.value)}
-                  placeholder={type === 'REG_DWORD' ? '0' : 'Texto o ruta...'}
-                  className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs font-mono text-slate-900 focus:border-sky-600 focus:outline-none"
-                />
+                {type === 'REG_MULTI_SZ' || type === 'REG_BINARY' ? (
+                  <textarea
+                    rows={3}
+                    value={data}
+                    onChange={(e) => setData(e.target.value)}
+                    placeholder={type === 'REG_BINARY' ? '00 01 a4 ff' : 'Una cadena por línea'}
+                    className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs font-mono text-slate-900 focus:border-sky-600 focus:outline-none"
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    value={data}
+                    onChange={(e) => setData(e.target.value)}
+                    placeholder={isNumericType(type) ? '0 (decimal) o 0x1F (hexadecimal)' : 'Texto o ruta...'}
+                    className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs font-mono text-slate-900 focus:border-sky-600 focus:outline-none"
+                  />
+                )}
+                {parsed && !parsed.ok && (
+                  <p role="alert" className="mt-1 text-[11px] text-red-700">
+                    {parsed.error}
+                  </p>
+                )}
               </div>
             </>
           )}
@@ -406,10 +461,17 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
             />
           </div>
 
+          {submitError && (
+            <p role="alert" className="rounded border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs text-red-800">
+              {submitError}
+            </p>
+          )}
+
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
             <button
               type="submit"
-              className="px-4 py-1.5 text-xs font-medium text-white bg-sky-600 rounded hover:bg-sky-700 transition-colors whitespace-nowrap shrink-0"
+              disabled={Boolean(parsed && !parsed.ok)}
+              className="px-4 py-1.5 text-xs font-medium text-white bg-sky-600 rounded hover:bg-sky-700 transition-colors whitespace-nowrap shrink-0 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Crear
             </button>

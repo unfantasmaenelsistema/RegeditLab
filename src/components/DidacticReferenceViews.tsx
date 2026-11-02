@@ -165,7 +165,7 @@ export const RegistryTypesAndHivesGuide: React.FC<DidacticReferenceProps> = ({ o
     {
       type: 'REG_SZ',
       name: 'Valor de cadena (String)',
-      format: 'Texto de longitud fija terminado en nulo',
+      format: 'Cadena de texto (UTF-16) terminada en nulo',
       example: 'C:\\Program Files',
       usage: 'Rutas de archivos, nombres de programas, descripciones y parámetros de texto.',
     },
@@ -186,8 +186,8 @@ export const RegistryTypesAndHivesGuide: React.FC<DidacticReferenceProps> = ({ o
     {
       type: 'REG_QWORD',
       name: 'Valor QWORD (64 bits)',
-      format: 'Entero de 64 bits',
-      example: '0x0000000000000000 (0)',
+      format: 'Entero sin signo de 64 bits (hasta 18.446.744.073.709.551.615)',
+      example: '0x100000000 (4294967296)',
       usage: 'Tamaños grandes de memoria, marcas de tiempo de 64 bits y direcciones de hardware.',
     },
     {

@@ -38,7 +38,15 @@ import {
   findNodeByPath,
   formatRegistryDataForDisplay,
   getValueData,
+  isFastStartupActive,
+  isMinerActive,
 } from './data/initialRegistry';
+import {
+  hasValueNamed,
+  isRegistryTree,
+  newId,
+  resolveRegistryAddress,
+} from './engine/registryEngine';
 import { CreateItemModal, ValueEditModal } from './components/ValueEditModal';
 import { BootSimulatorModal, RegExportModal } from './components/SystemModals';
 import {
@@ -46,10 +54,23 @@ import {
   RegistryTypesAndHivesGuide,
 } from './components/DidacticReferenceViews';
 
-const STORAGE_KEY = 'ufes_regedit_simulator_tree_v1';
+// v2: el árbol cambió (Control\Power, datos corregidos); un estado v1 no se reutiliza
+const STORAGE_KEY = 'ufes_regedit_simulator_tree_v2';
+const MAX_AUDIT_LOGS = 500;
+
+// Claves raíz donde regedit no deja crear subclaves (Nuevo → Clave aparece deshabilitado)
+const NO_NEW_SUBKEY_PATHS = ['equipo', 'equipo\\hkey_local_machine', 'equipo\\hkey_users'];
 
 function cloneTree(node: RegistryKeyNode): RegistryKeyNode {
   return JSON.parse(JSON.stringify(node));
+}
+
+function storageRemove(key: string) {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Almacenamiento bloqueado (modo privado, cookies desactivadas…)
+  }
 }
 
 function getAllAncestorPaths(fullPath: string): string[] {
@@ -69,7 +90,9 @@ export default function App() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed: unknown = JSON.parse(saved);
+        // Un estado manipulado o a medias dejaría la app en blanco en cada recarga
+        if (isRegistryTree(parsed) && parsed.path === 'Equipo') return parsed;
       }
     } catch {
       // Fallback to initial tree
@@ -95,6 +118,7 @@ export default function App() {
     'Equipo\\HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Power'
   );
   const [addressInput, setAddressInput] = useState<string>(selectedPath);
+  const [addressError, setAddressError] = useState<string | null>(null);
   const [expandedPaths, setExpandedPaths] = useState<Record<string, boolean>>(() => {
     const initialExpanded: Record<string, boolean> = {
       Equipo: true,
@@ -142,7 +166,15 @@ export default function App() {
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() => {
     try {
       const savedLogs = localStorage.getItem(`${STORAGE_KEY}_logs`);
-      if (savedLogs) return JSON.parse(savedLogs);
+      if (savedLogs) {
+        const parsed: unknown = JSON.parse(savedLogs);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(
+            (l): l is AuditLogEntry =>
+              l && typeof l.id === 'string' && typeof l.action === 'string' && typeof l.path === 'string'
+          );
+        }
+      }
     } catch {
       // Fallback
     }
@@ -215,6 +247,7 @@ export default function App() {
   ) => {
     const node = findNodeByPath(registryRoot, targetPath);
     if (!node) return;
+    setAddressError(null);
     const ancestors = getAllAncestorPaths(node.path);
     setExpandedPaths((prev) => {
       const next = { ...prev };
@@ -295,7 +328,7 @@ export default function App() {
         oldValue,
         newValue,
       },
-      ...prev.slice(0, 99),
+      ...prev.slice(0, MAX_AUDIT_LOGS - 1),
     ]);
   };
 
@@ -410,19 +443,30 @@ export default function App() {
   };
 
   // Update a value inside the selected key
-  const handleSaveValue = (valueId: string, newData: string, newName?: string) => {
+  const handleSaveValue = (valueId: string, newData: string, newName?: string): string | null => {
     const nextTree = cloneTree(registryRoot);
     const targetNode = findNodeByPath(nextTree, selectedPath);
-    if (!targetNode) return;
+    if (!targetNode) return null;
     const val = targetNode.values.find((v) => v.id === valueId);
-    if (!val) return;
-    const oldData = val.data;
-    val.data = newData;
-    if (newName && !val.isDefault) {
-      val.name = newName;
+    if (!val) return null;
+    const renamed = Boolean(newName && !val.isDefault && newName !== val.name);
+    if (renamed && hasValueNamed(targetNode, newName!, val.id)) {
+      return `El Editor del Registro no puede cambiar el nombre de ${val.name}. El nombre de valor especificado ya existe. Escriba otro nombre e inténtelo de nuevo.`;
     }
+    const oldName = val.name;
+    const oldData = val.data;
+    if (renamed) val.name = newName!;
+    val.data = newData;
+    if (!renamed && oldData === newData) return null;
     setRegistryRoot(nextTree);
-    addAuditLog('MODIFICAR', selectedPath, val.name, oldData, newData);
+    addAuditLog(
+      'MODIFICAR',
+      selectedPath,
+      renamed ? `${oldName} → ${val.name}` : val.name,
+      oldData,
+      newData
+    );
+    return null;
   };
 
   // Create a new value in the selected key
@@ -431,26 +475,31 @@ export default function App() {
     type: RegistryValueType,
     data: string,
     description: string
-  ) => {
+  ): string | null => {
     const nextTree = cloneTree(registryRoot);
     const targetNode = findNodeByPath(nextTree, selectedPath);
-    if (!targetNode) return;
-    const newId = `custom-val-${Date.now()}`;
-    targetNode.values.push({
-      id: newId,
-      name,
-      type,
-      data,
-      description,
-    });
+    if (!targetNode) return null;
+    if (targetNode.path === 'Equipo') {
+      return 'No se pueden crear valores en «Equipo»: selecciona antes una clave.';
+    }
+    if (hasValueNamed(targetNode, name)) {
+      return `Ya existe un valor llamado «${name}» en esta clave. Escriba otro nombre e inténtelo de nuevo.`;
+    }
+    const id = newId('custom-val');
+    targetNode.values.push({ id, name, type, data, description });
     setRegistryRoot(nextTree);
-    setSelectedValueId(newId);
+    setSelectedValueId(id);
     addAuditLog('CREAR_VALOR', selectedPath, name, undefined, data);
+    return null;
   };
 
-  // Delete a value
+  // Delete a value (regedit pide confirmación antes de borrar)
   const handleDeleteValue = (val: RegistryValue) => {
     if (val.isDefault) return;
+    const warning = val.isSystemCritical
+      ? `«${val.name}» es un valor CRÍTICO del sistema. Si elimina ciertos valores del Registro, el sistema podría volverse inestable. ¿Está seguro de que desea eliminarlo permanentemente?`
+      : `Si elimina ciertos valores del Registro, el sistema podría volverse inestable. ¿Está seguro de que desea eliminar permanentemente «${val.name}»?`;
+    if (!window.confirm(warning)) return;
     const nextTree = cloneTree(registryRoot);
     const targetNode = findNodeByPath(nextTree, selectedPath);
     if (!targetNode) return;
@@ -461,23 +510,29 @@ export default function App() {
   };
 
   // Create a new subkey
-  const handleCreateKey = (keyName: string, description: string) => {
+  const handleCreateKey = (keyName: string, description: string): string | null => {
     const nextTree = cloneTree(registryRoot);
     const targetNode = findNodeByPath(nextTree, selectedPath);
-    if (!targetNode) return;
+    if (!targetNode) return null;
+    if (NO_NEW_SUBKEY_PATHS.includes(targetNode.path.toLowerCase())) {
+      return `Windows no permite crear claves directamente en «${targetNode.name}»: solo contiene las colmenas cargadas. Selecciona una subclave (por ejemplo SOFTWARE).`;
+    }
+    if (keyName.includes('\\')) {
+      return 'El nombre de una clave no puede contener la barra invertida «\\».';
+    }
     const newPath = `${targetNode.path}\\${keyName}`;
     if (targetNode.children.some((c) => c.name.toLowerCase() === keyName.toLowerCase())) {
-      return;
+      return `No se puede crear la clave: ya existe «${keyName}» en esta ubicación.`;
     }
     targetNode.children.push({
       name: keyName,
       path: newPath,
-      hive: targetNode.hive === 'ROOT' ? 'HKCU' : targetNode.hive,
+      hive: targetNode.hive,
       scopeLabel: targetNode.scopeLabel,
       description,
       values: [
         {
-          id: `def-${Date.now()}`,
+          id: newId('def'),
           name: '(Predeterminado)',
           type: 'REG_SZ',
           data: '',
@@ -490,14 +545,28 @@ export default function App() {
     setExpandedPaths((prev) => ({ ...prev, [targetNode.path]: true, [newPath]: true }));
     setSelectedPath(newPath);
     setAddressInput(newPath);
+    setSelectedValueId(null);
     addAuditLog('CREAR_CLAVE', targetNode.path, keyName);
+    return null;
   };
 
   // Reset entire registry to factory state
   const handleResetRegistry = () => {
+    if (
+      !window.confirm(
+        'Se restaurará el Registro de fábrica y se perderán los cambios y casos resueltos (el historial de operaciones se conserva). ¿Continuar?'
+      )
+    ) {
+      return;
+    }
     const fresh = cloneTree(INITIAL_REGISTRY_TREE);
     setRegistryRoot(fresh);
-    localStorage.removeItem(STORAGE_KEY);
+    storageRemove(STORAGE_KEY);
+    // La clave seleccionada puede ser una creada por el alumno que ya no existe
+    if (!findNodeByPath(fresh, selectedPath)) {
+      setSelectedPath('Equipo');
+      setAddressInput('Equipo');
+    }
     addAuditLog('RESTAURAR', 'Equipo', 'Valores de fábrica restaurados');
   };
 
@@ -551,12 +620,7 @@ export default function App() {
 
   // Live OS Telemetry derived directly from current Registry values
   const liveOsState = useMemo(() => {
-    const hiberboot =
-      getValueData(
-        registryRoot,
-        'Equipo\\HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Power',
-        'HiberbootEnabled'
-      ) ?? '1';
+    const fastStartup = isFastStartupActive(registryRoot);
     const usbStart =
       getValueData(
         registryRoot,
@@ -569,25 +633,21 @@ export default function App() {
         'Equipo\\HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion',
         'ProgramFilesDir'
       ) ?? 'C:\\Program Files';
+    // Cualquier valor distinto de 0 activa la directiva; sin el valor no hay bloqueo
     const taskMgrBlocked =
-      getValueData(
+      (getValueData(
         registryRoot,
         'Equipo\\HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System',
         'DisableTaskMgr'
-      ) === '1';
+      ) ?? '0') !== '0';
+    // Sin HideFileExt, Windows oculta las extensiones conocidas (comportamiento por defecto)
     const extHidden =
       getValueData(
         registryRoot,
         'Equipo\\HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced',
         'HideFileExt'
-      ) === '1';
-    const minerActive = Boolean(
-      getValueData(
-        registryRoot,
-        'Equipo\\HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run',
-        'CryptoMinerUpdater'
-      )
-    );
+      ) !== '0';
+    const minerActive = isMinerActive(registryRoot);
     const longPaths =
       getValueData(
         registryRoot,
@@ -596,7 +656,7 @@ export default function App() {
       ) === '1';
 
     return {
-      hiberboot,
+      fastStartup,
       usbStart,
       installDir,
       taskMgrBlocked,
@@ -707,13 +767,13 @@ export default function App() {
       onClick={() => setOpenMenu(null)}
     >
       {/* Top Bar Contract: 3 Zones separated by gap-8 */}
-      <header className="flex items-center justify-between gap-8 px-6 py-3 bg-white border-b border-slate-200 sticky top-0 z-30">
+      <header className="flex items-center justify-between gap-4 lg:gap-8 px-4 sm:px-6 py-3 bg-white border-b border-slate-200 sticky top-0 z-30">
         {/* Zone 1: Brand Lockup */}
         <a
           href="https://www.unfantasmaenelsistema.com/"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-2.5 text-base font-bold tracking-tight text-slate-900 whitespace-nowrap shrink-0 group"
+          className="flex items-center gap-2.5 text-base font-bold tracking-tight text-slate-900 min-w-0 group"
         >
           {!logoError ? (
             <img
@@ -726,11 +786,11 @@ export default function App() {
           ) : (
             <Terminal className="h-6 w-6 text-sky-600 shrink-0" />
           )}
-          <span>RegEdit Lab · Un Fantasma en el Sistema</span>
+          <span className="truncate">RegEdit Lab · Un Fantasma en el Sistema</span>
         </a>
 
         {/* Zone 2: 4 Single-line Navigation Links */}
-        <nav className="hidden md:flex items-center gap-6 text-xs font-semibold text-slate-600">
+        <nav className="hidden lg:flex items-center gap-6 text-xs font-semibold text-slate-600">
           <button
             type="button"
             onClick={() => setActiveMainView('simulator')}
@@ -778,7 +838,7 @@ export default function App() {
         </nav>
 
         {/* Zone 3: 1 Primary Action Link */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="hidden sm:flex items-center gap-3 shrink-0">
           <a
             href="https://www.unfantasmaenelsistema.com/"
             target="_blank"
@@ -792,7 +852,7 @@ export default function App() {
       </header>
 
       {/* Mobile Navigation Bar */}
-      <div className="flex md:hidden items-center gap-2 overflow-x-auto px-4 py-2 bg-white border-b border-slate-200">
+      <div className="flex lg:hidden items-center gap-2 overflow-x-auto px-4 py-2 bg-white border-b border-slate-200">
         <button
           type="button"
           onClick={() => setActiveMainView('simulator')}
@@ -977,7 +1037,7 @@ export default function App() {
 
               {/* Regedit Menu Bar (Archivo, Edición, Ver, Favoritos) */}
               <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-100 border-b border-slate-200 px-2 py-1 text-xs">
-                <div className="flex items-center gap-1 relative">
+                <div className="flex flex-wrap items-center gap-1 relative">
                   {/* Archivo Menu */}
                   <div className="relative" onClick={(e) => e.stopPropagation()}>
                     <button
@@ -1248,7 +1308,16 @@ export default function App() {
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    navigateToPath(addressInput.trim());
+                    const resolved = resolveRegistryAddress(addressInput);
+                    if (resolved && findNodeByPath(registryRoot, resolved)) {
+                      navigateToPath(resolved);
+                    } else {
+                      setAddressError(
+                        resolved
+                          ? 'Esa clave no existe en el simulador. Comprueba la ruta o usa el buscador.'
+                          : 'La ruta debe empezar por una rama: HKLM, HKCU, HKCR, HKU o HKCC (o su nombre completo).'
+                      );
+                    }
                   }}
                   className="md:col-span-8 flex items-center gap-1.5"
                 >
@@ -1256,18 +1325,29 @@ export default function App() {
                   <input
                     type="text"
                     value={addressInput}
-                    onChange={(e) => setAddressInput(e.target.value)}
+                    onChange={(e) => {
+                      setAddressInput(e.target.value);
+                      setAddressError(null);
+                    }}
                     aria-label="Barra de direcciones del Registro"
+                    title="Admite rutas como HKLM\SYSTEM\CurrentControlSet\Services\USBSTOR; pulsa Intro para ir"
                     className="w-full rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-mono text-slate-800 focus:border-sky-600 focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText(selectedPath);
-                      setCopiedPath(true);
-                      setTimeout(() => setCopiedPath(false), 1500);
+                      // Como «Copiar nombre de clave» de regedit: sin el prefijo «Equipo\»
+                      navigator.clipboard
+                        ?.writeText(selectedPath.replace(/^Equipo\\?/, ''))
+                        .then(() => {
+                          setCopiedPath(true);
+                          setTimeout(() => setCopiedPath(false), 1500);
+                        })
+                        .catch(() => {
+                          // Portapapeles no disponible (contexto no seguro o permiso denegado)
+                        });
                     }}
-                    title="Copiar ruta de la clave"
+                    title="Copiar nombre de clave"
                     className="p-1.5 rounded border border-slate-300 bg-white text-slate-600 hover:bg-slate-100 shrink-0"
                   >
                     {copiedPath ? (
@@ -1351,6 +1431,12 @@ export default function App() {
                     </div>
                   )}
                 </div>
+
+                {addressError && (
+                  <p role="alert" className="md:col-span-12 text-[11px] text-red-700 pl-1">
+                    {addressError}
+                  </p>
+                )}
               </div>
 
               {/* Contextual Scope Banner (HKLM vs HKCU Educational Indicator + Mirror Key Jump) */}
@@ -1645,10 +1731,10 @@ export default function App() {
                     <span className="text-slate-600">Inicio Rápido (HKLM\...\Power):</span>
                     <span
                       className={`font-mono font-medium ${
-                        liveOsState.hiberboot === '0' ? 'text-emerald-700' : 'text-amber-700'
+                        !liveOsState.fastStartup ? 'text-emerald-700' : 'text-amber-700'
                       }`}
                     >
-                      {liveOsState.hiberboot === '0' ? '● 0 (Apagado Limpio)' : '▲ 1 (Híbrido Activo)'}
+                      {!liveOsState.fastStartup ? '● Desactivado (Apagado completo)' : '▲ Activo (Apagado híbrido)'}
                     </span>
                   </div>
 
@@ -1736,7 +1822,7 @@ export default function App() {
                         type="button"
                         onClick={() => {
                           setAuditLogs([]);
-                          localStorage.removeItem(`${STORAGE_KEY}_logs`);
+                          storageRemove(`${STORAGE_KEY}_logs`);
                         }}
                         className="text-[11px] text-slate-400 hover:text-red-600 transition-colors"
                         title="Vaciar historial de eventos"
@@ -1840,7 +1926,7 @@ export default function App() {
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
             <button
               type="button"
               onClick={handleResetRegistry}

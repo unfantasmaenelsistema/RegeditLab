@@ -48,7 +48,7 @@ export interface MissionScenario {
     | 'Almacenamiento y Rutas'
     | 'Directivas de Usuario';
   difficulty: 'Básico' | 'Intermedio' | 'Avanzado';
-  hiveFocus: 'HKLM' | 'HKCU' | 'HKLM vs HKCU';
+  hiveFocus: 'HKLM' | 'HKCU' | 'HKLM vs HKCU' | 'HKLM + HKU';
   symptom: string;
   didacticExplanation: string;
   targetPath: string;
